@@ -1,31 +1,80 @@
 package org.example;
-import java.util.List;
+
+import org.w3c.dom.*;
+import javax.xml.parsers.*;
+import java.io.*;
+import java.util.*;
 
 public class Main {
     public static void main(String[] args) {
-        String xsdPath = "src/main/resources/meta-model.xsd";
-        String erDiagramPath = "output/er_diagram.dot";
+        // Path to the XSD file
+        String xsdFilePath = "src/main/resources/meta-model.xsd";
 
-        List<String> sqlStatements = XSDToSQLConverter.parseXSD(xsdPath);
+        // Generate the table definitions from the XSD
+        List<String> tableDefinitions = XSDToSQLConverter.generateTablesFromXSD(xsdFilePath);
 
-        if (!sqlStatements.isEmpty()) {
-            DatabaseConnector.executeSQL(sqlStatements);
+        // Create the tables in the database
+        DatabaseConnector.executeTableCreationSQL(tableDefinitions);
 
-            // Generate ER Diagram
-//            ERDiagramGenerator.generateERDiagram(sqlStatements, erDiagramPath);
+        // Path to the XML file containing data to insert
+        String xmlFilePath = "src/main/resources/store.xml";
 
-            // Convert DOT file to PNG (Requires Graphviz installed)
-//            try {
-//                Process process = new ProcessBuilder("dot", "-Tpng", erDiagramPath, "-o", "output/er_diagram.png")
-//                        .start();
-//                process.waitFor();
-//                System.out.println("ER Diagram generated: output/er_diagram.png");
-//            } catch (Exception e) {
-//                System.out.println("Error generating ER Diagram.");
-//                e.printStackTrace();
-//            }
-        } else {
-            System.out.println("No SQL statements were generated.");
+        // Parse the XML and generate data to insert
+        List<Category> categories = parseXMLAndGenerateData(xmlFilePath);
+
+        // Insert the parsed data into the database
+        DatabaseConnector.insertData("abc", categories);  // "abc" is the store name
+    }
+
+    public static List<Category> parseXMLAndGenerateData(String xmlFilePath) {
+        List<Category> categories = new ArrayList<>();
+        try {
+            File xmlFile = new File(xmlFilePath);
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(xmlFile);
+
+            NodeList storeNodes = document.getElementsByTagName("store");
+
+            for (int i = 0; i < storeNodes.getLength(); i++) {
+                Element storeElement = (Element) storeNodes.item(i);
+
+                NodeList categoryNodes = storeElement.getElementsByTagName("category");
+                List<Category> categoryList = new ArrayList<>();
+
+                for (int j = 0; j < categoryNodes.getLength(); j++) {
+                    Element categoryElement = (Element) categoryNodes.item(j);
+                    String categoryName = categoryElement.getAttribute("category_name");
+
+                    NodeList subcategoryNodes = categoryElement.getElementsByTagName("subcategory");
+                    List<Subcategory> subcategoryList = new ArrayList<>();
+
+                    for (int k = 0; k < subcategoryNodes.getLength(); k++) {
+                        Element subcategoryElement = (Element) subcategoryNodes.item(k);
+                        String subcategoryName = subcategoryElement.getAttribute("subcategory_name");
+
+                        NodeList productNodes = subcategoryElement.getElementsByTagName("product");
+                        List<Product> productList = new ArrayList<>();
+
+                        for (int l = 0; l < productNodes.getLength(); l++) {
+                            Element productElement = (Element) productNodes.item(l);
+                            String productName = productElement.getAttribute("product_name");
+                            String price = productElement.getAttribute("price");
+                            productList.add(new Product(productName, price));
+                        }
+
+                        subcategoryList.add(new Subcategory(subcategoryName, productList));
+                    }
+
+                    categoryList.add(new Category(categoryName, subcategoryList));
+                }
+
+                categories.addAll(categoryList);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+
+        return categories;
     }
 }
