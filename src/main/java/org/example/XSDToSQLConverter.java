@@ -8,8 +8,10 @@ import java.util.*;
 public class XSDToSQLConverter {
     public static List<String> parseXSD(String xsdFilePath) {
         List<String> tableDefinitions = new ArrayList<>();
-        List<String> relationTables = new ArrayList<>();
         List<String> hierarchyInserts = new ArrayList<>();
+        Set<String> entityNames = new HashSet<>();
+        List<String> hierarchyEntities = new ArrayList<>();
+        Map<String, String> parentChildMap = new HashMap<>();
 
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -18,9 +20,12 @@ public class XSDToSQLConverter {
 
             NodeList entities = document.getElementsByTagName("Enitity");
 
+            // Create entity tables
             for (int i = 0; i < entities.getLength(); i++) {
                 Element entity = (Element) entities.item(i);
                 String tableName = entity.getAttribute("Name");
+                entityNames.add(tableName);
+                hierarchyEntities.add(tableName);
 
                 StringBuilder tableSQL = new StringBuilder("CREATE TABLE " + tableName + " (id INT AUTO_INCREMENT PRIMARY KEY, ");
                 NodeList attributes = entity.getElementsByTagName("attribute");
@@ -40,6 +45,65 @@ public class XSDToSQLConverter {
                 tableDefinitions.add(tableSQL.toString());
             }
 
+            // Build the entity hierarchy relationships
+            for (int i = 0; i < entities.getLength(); i++) {
+                Element entity = (Element) entities.item(i);
+                String source = entity.getAttribute("Name");
+                NodeList relations = entity.getElementsByTagName("relation");
+
+                for (int j = 0; j < relations.getLength(); j++) {
+                    Element relation = (Element) relations.item(j);
+                    String target = relation.getAttribute("target");
+                    parentChildMap.put(target, source);
+                }
+            }
+
+            // Find the leaf entity (one with no children)
+            String leafEntity = null;
+            for (String entity : hierarchyEntities) {
+                if (!parentChildMap.containsValue(entity)) {
+                    leafEntity = entity;
+                    break;
+                }
+            }
+
+            if (leafEntity != null) {
+                // Build the complete hierarchy path from leaf to root
+                List<String> hierarchyPath = new ArrayList<>();
+                hierarchyPath.add(leafEntity);
+
+                String current = leafEntity;
+                while (parentChildMap.containsKey(current)) {
+                    current = parentChildMap.get(current);
+                    hierarchyPath.add(current);
+                }
+
+                // Create relationship table based on the hierarchy
+                StringBuilder relationshipSQL = new StringBuilder("CREATE TABLE " + leafEntity + "_relationships (");
+                relationshipSQL.append("id INT AUTO_INCREMENT PRIMARY KEY");
+
+                for (String entity : hierarchyPath) {
+                    relationshipSQL.append(", ").append(entity).append("_id INT NOT NULL");
+                }
+
+                for (String entity : hierarchyPath) {
+                    relationshipSQL.append(", FOREIGN KEY (").append(entity).append("_id) ")
+                            .append("REFERENCES ").append(entity).append("(id)");
+                }
+
+                relationshipSQL.append(");");
+                tableDefinitions.add(relationshipSQL.toString());
+            }
+
+            // Create hierarchy table for metadata
+            tableDefinitions.add("CREATE TABLE entity_hierarchy (" +
+                    "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                    "parent_entity VARCHAR(255), " +
+                    "child_entity VARCHAR(255), " +
+                    "relation_name VARCHAR(255)" +
+                    ");");
+
+            // Add hierarchy metadata
             for (int i = 0; i < entities.getLength(); i++) {
                 Element entity = (Element) entities.item(i);
                 String source = entity.getAttribute("Name");
@@ -50,25 +114,11 @@ public class XSDToSQLConverter {
                     String target = relation.getAttribute("target");
                     String relName = relation.getAttribute("Name");
 
-                    String relTable = "relation_" + source + "_" + relName;
-                    String relSQL = "CREATE TABLE " + relTable + " (" +
-                            "id INT AUTO_INCREMENT PRIMARY KEY, " +
-                            source + "_id INT, " + target + "_id INT, " +
-                            "FOREIGN KEY (" + source + "_id) REFERENCES " + source + "(id), " +
-                            "FOREIGN KEY (" + target + "_id) REFERENCES " + target + "(id)" +
-                            ");";
-                    relationTables.add(relSQL);
-
                     hierarchyInserts.add("INSERT INTO entity_hierarchy (parent_entity, child_entity, relation_name) VALUES " +
                             "('" + source + "', '" + target + "', '" + relName + "');");
                 }
             }
 
-            tableDefinitions.add("CREATE TABLE entity_hierarchy (" +
-                    "id INT AUTO_INCREMENT PRIMARY KEY, " +
-                    "parent_entity VARCHAR(255), child_entity VARCHAR(255), relation_name VARCHAR(255));");
-
-            tableDefinitions.addAll(relationTables);
             tableDefinitions.addAll(hierarchyInserts);
 
         } catch (Exception e) {
