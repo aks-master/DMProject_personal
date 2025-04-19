@@ -6,8 +6,8 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) {
         String metaMetaModelPath = "src/main/resources/meta-meta-model.xsd";
-        String metaModelPath = "src/main/resources/meta-model-store.xsd"; // Change between lib and store as needed
-        String xmlPath = "src/main/resources/store.xml"; // Change between lib.xml and store.xml as needed
+        String metaModelPath = "src/main/resources/meta-model-lib.xsd"; // Change between lib and store as needed
+        String xmlPath = "src/main/resources/lib.xml"; // Change between lib.xml and store.xml as needed
 
         if (!XMLValidator.validateXMLSchema(metaMetaModelPath, metaModelPath)) {
             System.out.println("Validation failed: meta-model.xsd is not valid against meta-meta-model.xsd");
@@ -37,10 +37,11 @@ public class Main {
         System.out.println(sqlStatements);
 
 //        DatabaseConnector.executeSQL(sqlStatements);
+
         XMLDataInserter.insertStoreData(xmlPath);
 
 
-//        DataRetriever.displayInsertedTables();
+        DataRetriever.displayInsertedTables();
     }
 
     private static String extractDatabaseName(String metaModelPath) {
