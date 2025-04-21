@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<meta-meta-model xmlns="http://iiitb.ac.in/mt2024111"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://iiitb.ac.in/mt2024111 meta-meta-model.xsd">
+    <Enitity Name="university">
+        <attribute Name="university_name" type="string"/>
+        <relation Name="HasDepartment" target="department"/>
+    <Enitity Name="university_name">
+    </Enitity>
+    <Enitity Name="department">
+    </Enitity>
+    </Enitity>
+</meta-meta-model>

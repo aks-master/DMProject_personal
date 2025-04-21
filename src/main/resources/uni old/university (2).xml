@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<university university_name="Tech University">
+    <department department_name="Computer Science">
+        <course course_name="Data Structures">
+            <student student_name="Alice" roll_no="CS101"/>
+            <student student_name="Bob" roll_no="CS102"/>
+        </course>
+        <course course_name="Algorithms">
+            <student student_name="Charlie" roll_no="CS201"/>
+        </course>
+    </department>
+    <department department_name="Mechanical Engineering">
+        <course course_name="Thermodynamics">
+            <student student_name="David" roll_no="ME101"/>
+        </course>
+    </department>
+</university>
