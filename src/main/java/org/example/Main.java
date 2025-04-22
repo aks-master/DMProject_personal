@@ -6,33 +6,38 @@ import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("Choose your desired option:");
-        System.out.println("1. Process existing XML file and create database from it");
-        System.out.println("2. Convert JSON file to the required XML format");
-        System.out.print("Enter choice (1 or 2): ");
-        int choice = scanner.nextInt();
-        scanner.nextLine(); // consume newline
+        try {
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Choose your desired option:");
+            System.out.println("1. Process existing XML file and create database from it");
+            System.out.println("2. Convert JSON file to the required XML format");
+            System.out.print("Enter choice (1 or 2): ");
+            int choice = scanner.nextInt();
+            scanner.nextLine(); // consume newline
 
-        switch (choice) {
-            case 1:
-                runXMLWorkflow();
-                break;
-            case 2:
-                runJSONWorkflow();
-                break;
-            default:
-                System.out.println("Invalid choice.");
+            switch (choice) {
+                case 1:
+                    runXMLWorkflow();
+                    break;
+                case 2:
+                    runJSONWorkflow();
+                    break;
+                default:
+                    System.out.println("Invalid choice.");
+            }
+
+            scanner.close();
+        } finally {
+            // Close connection pool when application exits
+            DatabaseConnector.closePool();
         }
-
-        scanner.close();
     }
 
     private static void runXMLWorkflow() {
         try {
             String metaMetaModelPath = "src/main/resources/meta-meta-model.xsd";
-            String metaModelPath = "src/main/resources/meta-model-store.xsd";
-            String dataXMLPath = "src/main/resources/store.xml";
+            String metaModelPath = "src/main/resources/meta-model-university.xml";
+            String dataXMLPath = "src/main/resources/university.xml";
 
             if (!XMLValidator.validateXMLSchema(metaMetaModelPath, metaModelPath)) {
                 System.out.println("Validation failed: meta-model.xsd is not valid against meta-meta-model.xsd");

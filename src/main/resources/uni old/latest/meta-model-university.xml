@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<meta-meta-model xmlns="http://iiitb.ac.in/mt2024111"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://iiitb.ac.in/mt2024111 meta-meta-model.xsd">
+    <Enitity Name="university">
+        <attribute Name="university_name" type="string"/>
+        <relation Name="HasDepartment" target="department"/>
+    </Enitity>
+    <Enitity Name="department">
+        <attribute Name="department_name" type="string"/>
+        <relation Name="HasCourse" target="course"/>
+    </Enitity>
+    <Enitity Name="course">
+        <attribute Name="course_name" type="string"/>
+        <relation Name="HasStudent" target="student"/>
+    </Enitity>
+    <Enitity Name="student">
+        <attribute Name="student_name" type="string"/>
+        <attribute Name="roll_no" type="string"/>
+    </Enitity>
+</meta-meta-model>

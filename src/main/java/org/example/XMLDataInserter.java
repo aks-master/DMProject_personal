@@ -101,11 +101,9 @@ public class XMLDataInserter {
             attributeMap.put(attr.getNodeName(), attr.getNodeValue());
         }
 
-        // Insert entity
-        int entityId = insertEntity(conn, tag, attributeMap);
+        // Get or insert entity
+        int entityId = getOrInsertEntity(conn, tag, attributeMap);
         if (entityId > 0) {
-            System.out.println("Inserted " + tag + ": " + attributeMap);
-
             // Create new context with this entity
             Map<String, Integer> currentContext = new HashMap<>(parentContext);
             currentContext.put(tag, entityId);
@@ -113,7 +111,7 @@ public class XMLDataInserter {
             // Check if this is a leaf entity
             boolean isLeaf = isLeafEntity(tag, hierarchyRules);
             if (isLeaf) {
-                insertRelationship(conn, currentContext);
+                getOrInsertRelationship(conn, currentContext);
             }
 
             // Process child elements
@@ -137,7 +135,7 @@ public class XMLDataInserter {
         return children == null || children.isEmpty();
     }
 
-    private static int insertEntity(Connection conn, String entityType, Map<String, String> attributeMap) throws SQLException {
+    private static int getOrInsertEntity(Connection conn, String entityType, Map<String, String> attributeMap) throws SQLException {
         if (attributeMap.isEmpty()) {
             return -1;
         }
@@ -148,6 +146,58 @@ public class XMLDataInserter {
             throw new SQLException("Table " + entityType + " does not exist or has no columns");
         }
 
+        // First, check if entity already exists
+        int existingId = findExistingEntity(conn, entityType, attributeMap, tableColumns);
+        if (existingId > 0) {
+            System.out.println("Found existing " + entityType + " with id: " + existingId);
+            return existingId;
+        }
+
+        // If not, insert new entity
+        return insertEntity(conn, entityType, attributeMap, tableColumns);
+    }
+
+    private static int findExistingEntity(Connection conn, String entityType, Map<String, String> attributeMap,
+                                          List<String> tableColumns) throws SQLException {
+        StringBuilder sql = new StringBuilder("SELECT id FROM " + entityType + " WHERE ");
+        List<String> conditions = new ArrayList<>();
+        List<String> values = new ArrayList<>();
+
+        for (String column : tableColumns) {
+            if (column.equals("id")) continue; // Skip ID column
+
+            for (Map.Entry<String, String> entry : attributeMap.entrySet()) {
+                if (column.equals(entry.getKey())) {
+                    conditions.add(column + " = ?");
+                    values.add(entry.getValue());
+                    break;
+                }
+            }
+        }
+
+        if (conditions.isEmpty()) {
+            return -1;
+        }
+
+        sql.append(String.join(" AND ", conditions));
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < values.size(); i++) {
+                stmt.setString(i + 1, values.get(i));
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("id");
+                }
+            }
+        }
+
+        return -1; // Not found
+    }
+
+    private static int insertEntity(Connection conn, String entityType, Map<String, String> attributeMap,
+                                    List<String> tableColumns) throws SQLException {
         // Match attributes to columns
         StringBuilder sql = new StringBuilder("INSERT INTO " + entityType + " (");
         StringBuilder placeholders = new StringBuilder(") VALUES (");
@@ -186,7 +236,9 @@ public class XMLDataInserter {
             if (affected > 0) {
                 try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
                     if (generatedKeys.next()) {
-                        return generatedKeys.getInt(1);
+                        int id = generatedKeys.getInt(1);
+                        System.out.println("Inserted new " + entityType + ": " + attributeMap);
+                        return id;
                     }
                 }
             }
@@ -206,7 +258,7 @@ public class XMLDataInserter {
         return columns;
     }
 
-    private static void insertRelationship(Connection conn, Map<String, Integer> contextMap) throws SQLException {
+    private static void getOrInsertRelationship(Connection conn, Map<String, Integer> contextMap) throws SQLException {
         // Get database name
         String dbName = DatabaseConnector.getDatabaseName();
 
@@ -232,33 +284,65 @@ public class XMLDataInserter {
             return; // Can't find leaf entity in context
         }
 
-        // Build the SQL statement
+        // Build the relationship table and columns
         String relationshipTable = leafEntity + "_relationships";
-        StringBuilder sql = new StringBuilder("INSERT INTO " + relationshipTable + " (");
-        StringBuilder valuesClause = new StringBuilder(") VALUES (");
-        List<Integer> valuesList = new ArrayList<>();
-
-        // Get column names from relationship table to ensure we only include valid columns
         List<String> columns = getTableColumns(conn, relationshipTable);
-        Set<String> columnSet = new HashSet<>();
-        for (String col : columns) {
-            if (!col.equals("id")) { // Skip auto-increment primary key
-                columnSet.add(col);
-            }
-        }
+        Map<String, Integer> columnValues = new HashMap<>();
 
         for (Map.Entry<String, Integer> entry : contextMap.entrySet()) {
             String columnName = entry.getKey() + "_id";
-            if (columnSet.contains(columnName)) {
-                sql.append(columnName).append(", ");
-                valuesClause.append("?, ");
-                valuesList.add(entry.getValue());
+            if (columns.contains(columnName)) {
+                columnValues.put(columnName, entry.getValue());
             }
         }
 
-        // If no columns match, return
-        if (valuesList.isEmpty()) {
+        if (columnValues.isEmpty()) {
             return;
+        }
+
+        // Check if relationship already exists
+        if (relationshipExists(conn, relationshipTable, columnValues)) {
+            System.out.println("Relationship already exists for " + leafEntity + " id: " + contextMap.get(leafEntity));
+            return;
+        }
+
+        // Insert new relationship
+        insertRelationship(conn, relationshipTable, columnValues);
+    }
+
+    private static boolean relationshipExists(Connection conn, String table, Map<String, Integer> columnValues)
+            throws SQLException {
+        StringBuilder sql = new StringBuilder("SELECT id FROM " + table + " WHERE ");
+        List<String> conditions = new ArrayList<>();
+
+        for (Map.Entry<String, Integer> entry : columnValues.entrySet()) {
+            conditions.add(entry.getKey() + " = ?");
+        }
+
+        sql.append(String.join(" AND ", conditions));
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            int index = 1;
+            for (Integer value : columnValues.values()) {
+                stmt.setInt(index++, value);
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next(); // Returns true if relationship exists
+            }
+        }
+    }
+
+    private static void insertRelationship(Connection conn, String table, Map<String, Integer> columnValues)
+            throws SQLException {
+        StringBuilder sql = new StringBuilder("INSERT INTO " + table + " (");
+        StringBuilder valuesClause = new StringBuilder(") VALUES (");
+        List<Integer> valuesList = new ArrayList<>();
+
+        for (Map.Entry<String, Integer> entry : columnValues.entrySet()) {
+            sql.append(entry.getKey()).append(", ");
+            valuesClause.append("?, ");
+            valuesList.add(entry.getValue());
         }
 
         // Remove trailing commas
@@ -273,7 +357,7 @@ public class XMLDataInserter {
                 stmt.setInt(i + 1, valuesList.get(i));
             }
             stmt.executeUpdate();
-            System.out.println("Inserted relationship for " + leafEntity + " id: " + contextMap.get(leafEntity));
+            System.out.println("Inserted new relationship in " + table);
         }
     }
 }
