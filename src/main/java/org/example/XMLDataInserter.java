@@ -29,7 +29,7 @@ public class XMLDataInserter {
 
                 // Process and insert the XML data
                 Map<String, Integer> contextMap = new HashMap<>();
-                processElement(conn, root, contextMap);
+                processElement(conn, root, contextMap, hierarchyRules);
 
                 System.out.println("Data insertion completed successfully.");
             }
@@ -89,7 +89,8 @@ public class XMLDataInserter {
         return true;
     }
 
-    private static void processElement(Connection conn, Element element, Map<String, Integer> parentContext) throws SQLException {
+    private static void processElement(Connection conn, Element element, Map<String, Integer> parentContext,
+                                       Map<String, Set<String>> hierarchyRules) throws SQLException {
         String tag = element.getTagName();
 
         // Get attributes
@@ -110,21 +111,30 @@ public class XMLDataInserter {
             currentContext.put(tag, entityId);
 
             // Check if this is a leaf entity
-            String dbName = DatabaseConnector.getDatabaseName();
-            if ((dbName.equals("lib") && tag.equals("book")) ||
-                    (dbName.equals("store") && tag.equals("product"))) {
+            boolean isLeaf = isLeafEntity(tag, hierarchyRules);
+            if (isLeaf) {
                 insertRelationship(conn, currentContext);
-                System.out.println("Inserted relationship for " + tag + " id: " + entityId);
             }
 
             // Process child elements
             NodeList childNodes = element.getChildNodes();
             for (int i = 0; i < childNodes.getLength(); i++) {
                 if (childNodes.item(i).getNodeType() == Node.ELEMENT_NODE) {
-                    processElement(conn, (Element) childNodes.item(i), currentContext);
+                    processElement(conn, (Element) childNodes.item(i), currentContext, hierarchyRules);
                 }
             }
         }
+    }
+
+    private static boolean isLeafEntity(String entityName, Map<String, Set<String>> hierarchyRules) {
+        // An entity is a leaf if it's not a parent in any rule
+        // or if it only has empty children sets
+        if (!hierarchyRules.containsKey(entityName)) {
+            return true;
+        }
+
+        Set<String> children = hierarchyRules.get(entityName);
+        return children == null || children.isEmpty();
     }
 
     private static int insertEntity(Connection conn, String entityType, Map<String, String> attributeMap) throws SQLException {
@@ -197,11 +207,26 @@ public class XMLDataInserter {
     }
 
     private static void insertRelationship(Connection conn, Map<String, Integer> contextMap) throws SQLException {
-        // Get database name to determine the correct relationship table
+        // Get database name
         String dbName = DatabaseConnector.getDatabaseName();
 
-        // Determine leaf entity based on database
-        String leafEntity = dbName.equals("lib") ? "book" : "product";
+        // Determine leaf entity by querying the entity_hierarchy table
+        String leafEntity = null;
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT child_entity FROM entity_hierarchy " +
+                     "WHERE child_entity NOT IN (SELECT parent_entity FROM entity_hierarchy)")) {
+            if (rs.next()) {
+                leafEntity = rs.getString("child_entity");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error finding leaf entity: " + e.getMessage());
+            return;
+        }
+
+        if (leafEntity == null) {
+            System.out.println("Could not determine leaf entity for relationships");
+            return;
+        }
 
         if (!contextMap.containsKey(leafEntity)) {
             return; // Can't find leaf entity in context
@@ -213,10 +238,22 @@ public class XMLDataInserter {
         StringBuilder valuesClause = new StringBuilder(") VALUES (");
         List<Integer> valuesList = new ArrayList<>();
 
+        // Get column names from relationship table to ensure we only include valid columns
+        List<String> columns = getTableColumns(conn, relationshipTable);
+        Set<String> columnSet = new HashSet<>();
+        for (String col : columns) {
+            if (!col.equals("id")) { // Skip auto-increment primary key
+                columnSet.add(col);
+            }
+        }
+
         for (Map.Entry<String, Integer> entry : contextMap.entrySet()) {
-            sql.append(entry.getKey()).append("_id, ");
-            valuesClause.append("?, ");
-            valuesList.add(entry.getValue());
+            String columnName = entry.getKey() + "_id";
+            if (columnSet.contains(columnName)) {
+                sql.append(columnName).append(", ");
+                valuesClause.append("?, ");
+                valuesList.add(entry.getValue());
+            }
         }
 
         // If no columns match, return
@@ -236,6 +273,7 @@ public class XMLDataInserter {
                 stmt.setInt(i + 1, valuesList.get(i));
             }
             stmt.executeUpdate();
+            System.out.println("Inserted relationship for " + leafEntity + " id: " + contextMap.get(leafEntity));
         }
     }
 }

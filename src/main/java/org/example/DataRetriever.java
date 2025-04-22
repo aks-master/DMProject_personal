@@ -5,77 +5,75 @@ import java.sql.*;
 public class DataRetriever {
     public static void displayInsertedTables() {
         String dbName = DatabaseConnector.getDatabaseName();
-        try (Connection conn = DatabaseConnector.getConnection();
-             Statement stmt = conn.createStatement()) {
+        try (Connection conn = DatabaseConnector.getConnection()) {
+            System.out.println("\nDisplaying tables for database: " + dbName);
 
-            // Determine root table based on database
-            String rootTable;
-            if (dbName.equals("lib")) {
-                rootTable = "library";
-            } else if (dbName.equals("store")) {
-                rootTable = "store";
-            } else {
-                System.out.println("Unknown database schema: " + dbName);
-                return;
+            // Get database metadata
+            DatabaseMetaData metaData = conn.getMetaData();
+            ResultSet tables = metaData.getTables(dbName, null, "%", new String[]{"TABLE"});
+
+            boolean hasAnyTable = false;
+
+            // Display each table
+            while (tables.next()) {
+                hasAnyTable = true;
+                String tableName = tables.getString("TABLE_NAME");
+                System.out.println("\nTable: " + tableName);
+                displayTableData(conn, tableName);
             }
 
-            ResultSet rs = stmt.executeQuery("SELECT * FROM " + rootTable);
-
-            // Display results
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
-
-            System.out.println("\nData in " + rootTable + " table:");
-
-            // Print column headers
-            for (int i = 1; i <= columnCount; i++) {
-                System.out.print(metaData.getColumnName(i) + "\t");
-            }
-            System.out.println();
-
-            // Print data rows
-            while (rs.next()) {
-                for (int i = 1; i <= columnCount; i++) {
-                    System.out.print(rs.getString(i) + "\t");
-                }
-                System.out.println();
+            if (!hasAnyTable) {
+                System.out.println("No tables found in the database.");
             }
 
-            // Also display relationships
-            String leafEntity = dbName.equals("lib") ? "book" : "product";
-            displayRelationships(conn, leafEntity);
+            // this code shows relatipships table again hence commented
+            // Try to display relationships table if it exists
+//            try {
+//                System.out.println("\nAttempting to show relationship tables:");
+//                ResultSet relationshipTables = metaData.getTables(dbName, null, "%relationships", new String[]{"TABLE"});
+//                while (relationshipTables.next()) {
+//                    String tableName = relationshipTables.getString("TABLE_NAME");
+//                    System.out.println("\nRelationship table: " + tableName);
+//                    displayTableData(conn, tableName);
+//                }
+//            } catch (SQLException e) {
+//                // Silently ignore if no relationship tables exist
+//            }
 
         } catch (SQLException e) {
+            System.out.println("Error retrieving database tables: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private static void displayRelationships(Connection conn, String leafEntity) {
-        try (Statement stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT * FROM " + leafEntity + "_relationships");
+    private static void displayTableData(Connection conn, String tableName) {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM " + tableName + " LIMIT 10")) {
 
-            // Display results
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
-
-            System.out.println("\nData in " + leafEntity + "_relationships table:");
+            ResultSetMetaData rsMetaData = rs.getMetaData();
+            int columnCount = rsMetaData.getColumnCount();
 
             // Print column headers
             for (int i = 1; i <= columnCount; i++) {
-                System.out.print(metaData.getColumnName(i) + "\t");
+                System.out.print(rsMetaData.getColumnName(i) + "\t");
             }
             System.out.println();
 
             // Print data rows
+            boolean hasData = false;
             while (rs.next()) {
+                hasData = true;
                 for (int i = 1; i <= columnCount; i++) {
                     System.out.print(rs.getString(i) + "\t");
                 }
                 System.out.println();
             }
+
+            if (!hasData) {
+                System.out.println("(No data)");
+            }
         } catch (SQLException e) {
-            // Table might not exist yet or have no data
-            System.out.println("No relationship data available for " + leafEntity);
+            System.out.println("Error displaying table " + tableName + ": " + e.getMessage());
         }
     }
 }

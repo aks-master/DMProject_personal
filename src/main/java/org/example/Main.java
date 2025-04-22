@@ -7,9 +7,9 @@ import java.util.Scanner;
 public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Choose input type:");
-        System.out.println("1. XML");
-        System.out.println("2. JSON");
+        System.out.println("Choose your desired option:");
+        System.out.println("1. Process existing XML file and create database from it");
+        System.out.println("2. Convert JSON file to the required XML format");
         System.out.print("Enter choice (1 or 2): ");
         int choice = scanner.nextInt();
         scanner.nextLine(); // consume newline
@@ -31,8 +31,8 @@ public class Main {
     private static void runXMLWorkflow() {
         try {
             String metaMetaModelPath = "src/main/resources/meta-meta-model.xsd";
-            String metaModelPath = "src/main/resources/meta-model-university.xml";
-            String dataXMLPath = "src/main/resources/university.xml";
+            String metaModelPath = "src/main/resources/meta-model-store.xsd";
+            String dataXMLPath = "src/main/resources/store.xml";
 
             if (!XMLValidator.validateXMLSchema(metaMetaModelPath, metaModelPath)) {
                 System.out.println("Validation failed: meta-model.xsd is not valid against meta-meta-model.xsd");
