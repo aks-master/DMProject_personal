@@ -36,8 +36,8 @@ public class Main {
     private static void runXMLWorkflow() {
         try {
             String metaMetaModelPath = "src/main/resources/meta-meta-model.xsd";
-            String metaModelPath = "src/main/resources/meta-model-university.xml";
-            String dataXMLPath = "src/main/resources/university.xml";
+            String metaModelPath = "src/main/resources/meta-model-lib.xml";
+            String dataXMLPath = "src/main/resources/lib.xml";
 
             if (!XMLValidator.validateXMLSchema(metaMetaModelPath, metaModelPath)) {
                 System.out.println("Validation failed: meta-model.xsd is not valid against meta-meta-model.xsd");

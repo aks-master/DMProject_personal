@@ -88,7 +88,8 @@ public class XSDToSQLConverter {
 
                 for (String entity : hierarchyPath) {
                     relationshipSQL.append(", FOREIGN KEY (").append(entity).append("_id) ")
-                            .append("REFERENCES ").append(entity).append("(id)");
+                            .append("REFERENCES ").append(entity).append("(id) ")
+                            .append("ON DELETE CASCADE ON UPDATE CASCADE");
                 }
 
                 relationshipSQL.append(");");
