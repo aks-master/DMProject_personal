@@ -34,13 +34,18 @@ public class Main {
     }
 
     private static void runXMLWorkflow() {
-        try {
-            String metaMetaModelPath = "src/main/resources/meta-meta-model.xsd";
-            String metaModelPath = "src/main/resources/meta-model-lib.xml";
-            String dataXMLPath = "src/main/resources/lib.xml";
+        try (Scanner scanner = new Scanner(System.in)) {
+            System.out.print("Enter the path to the meta-meta-model XSD file: ");
+            String metaMetaModelPath = scanner.nextLine();
+
+            System.out.print("Enter the path to the meta-model XML file: ");
+            String metaModelPath = scanner.nextLine();
+
+            System.out.print("Enter the path to the data XML file: ");
+            String dataXMLPath = scanner.nextLine();
 
             if (!XMLValidator.validateXMLSchema(metaMetaModelPath, metaModelPath)) {
-                System.out.println("Validation failed: meta-model.xsd is not valid against meta-meta-model.xsd");
+                System.out.println("Validation failed: meta-model XML is not valid against meta-meta-model XSD.");
                 return;
             }
 
@@ -65,6 +70,7 @@ public class Main {
             }
             System.out.println("SQL statements generated:");
             System.out.println(sqlStatements);
+
             // Step 1: Execute SQL statements to create tables
             DatabaseConnector.executeSQL(sqlStatements);
 

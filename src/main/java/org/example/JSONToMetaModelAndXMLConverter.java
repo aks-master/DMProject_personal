@@ -8,14 +8,18 @@ import java.io.FileWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashSet;
+import java.util.Scanner;
 import java.util.Set;
 
 public class JSONToMetaModelAndXMLConverter {
 
     public static void convert() {
-        try {
-            // Path to your JSON file
-            String jsonFilePath = "src/main/resources/university.json";
+        try (Scanner scanner = new Scanner(System.in)) {
+            // Prompt the user for the JSON file path
+            System.out.print("Enter the path to the JSON file: ");
+            String jsonFilePath = scanner.nextLine();
+
+            // Read the JSON file
             String jsonContent = new String(Files.readAllBytes(Paths.get(jsonFilePath)));
             JSONObject json = new JSONObject(jsonContent);
 
